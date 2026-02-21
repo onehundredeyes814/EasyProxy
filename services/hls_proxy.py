@@ -4,6 +4,7 @@ import re
 import sys
 import random
 import os
+import socket
 import urllib.parse
 from urllib.parse import urlparse, urljoin
 import base64
@@ -302,7 +303,8 @@ class HLSProxy:
                 limit=0,  # Unlimited connections
                 limit_per_host=0,  # Unlimited per host
                 keepalive_timeout=60,  # Keep connections alive longer
-                enable_cleanup_closed=True
+                enable_cleanup_closed=True,
+                family=socket.AF_INET  # Force IPv4 to avoid IPv6 issues (e.g. Vavoo promo)
             )
             self.session = aiohttp.ClientSession(
                 timeout=ClientTimeout(total=30),
@@ -340,7 +342,8 @@ class HLSProxy:
                     proxy,
                     limit=0,  # Unlimited connections
                     limit_per_host=0,  # Unlimited per host
-                    keepalive_timeout=60  # Keep connections alive longer
+                    keepalive_timeout=60,  # Keep connections alive longer
+                    family=socket.AF_INET  # Force IPv4
                 )
                 timeout = ClientTimeout(total=30)
                 session = ClientSession(timeout=timeout, connector=connector)
@@ -1478,8 +1481,12 @@ class HLSProxy:
                         
                         api_password = request.query.get('api_password')
                         no_bypass = request.query.get('no_bypass') == '1'
+                        
+                        # Use the final URL after redirects as the base for rewriting relative paths
+                        final_stream_url = str(resp.url)
+                        
                         rewritten_manifest = await ManifestRewriter.rewrite_manifest_urls(
-                            manifest_content, stream_url, proxy_base, headers, original_channel_url, api_password, self.get_extractor, no_bypass
+                            manifest_content, final_stream_url, proxy_base, headers, original_channel_url, api_password, self.get_extractor, no_bypass
                         )
                         
                         return web.Response(
